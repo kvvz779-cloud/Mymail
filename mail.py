@@ -1,7 +1,7 @@
 import os
 import re
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # Директория для хранения файлов по штатам
 DATA_DIR = "emails_by_state"
@@ -58,15 +58,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
     if text == "Добавить email":
-        await update.message.reply_text(
-            "Отправьте email и штат в формате: email|штат\nПример: user@example.com|IL"
-        )
-        return
+        return  # ждём ввода без подсказки
 
     elif text == "Взять email":
         states = get_state_files()
         if not states:
             await update.message.reply_text("Нет доступных email'ов.")
+            await start(update, context)
             return
 
         keyboard = [[KeyboardButton(state)] for state in states]
@@ -88,31 +86,54 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await start(update, context)
         return
 
-    # Обработка формата email|штат
-    elif '|' in text:
-        parts = text.split('|', 1)
-        email, state = parts[0].strip(), parts[1].strip().upper()
+    # Обработка списка email (поддерживает & и |)
+    elif any(sep in text for sep in ['&', '|']):
+        lines = text.split('\n')
+        added_count = 0
 
-        if not is_valid_email(email):
-            await update.message.reply_text("Некорректный email. Попробуйте снова.")
-            return
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
 
-        if not state.isalpha() or len(state) != 2:
-            await update.message.reply_text("Штат должен быть двухбуквенным кодом (например, IL).")
-            return
+            sep = '&' if '&' in line else '|'
+            parts = line.split(sep, 1)
+            if len(parts) != 2:
+                continue
 
-        add_email_to_state(state, email)
-        await update.message.reply_text(f"Email {email} добавлен в штат {state}.")
+            email, state = parts[0].strip(), parts[1].strip().upper()
+
+            if not is_valid_email(email):
+                continue
+
+            if not state.isalpha() or len(state) != 2:
+                continue
+
+            add_email_to_state(state, email)
+            added_count += 1
+
+        if added_count > 0:
+            await update.message.reply_text(f"Добавлено {added_count} email(ов).")
+        else:
+            await update.message.reply_text("Не найдено корректных записей.")
+
+        await start(update, context)
         return
 
-    # Обработка выбора штата для взятия email
+    # Взятие email — отправляем только кликабельный email
     elif len(text) == 2 and text.isalpha():
         state = text.upper()
         email = remove_email_from_state(state)
         if email:
-            await update.message.reply_text(f"Взятый email из штата {state}: {email}")
+            await update.message.reply_text(
+                f"[{email}](mailto:{email})",
+                parse_mode="MarkdownV2",
+                disable_web_page_preview=True
+            )
         else:
             await update.message.reply_text(f"В штате {state} нет email'ов.")
+
+        await start(update, context)
         return
 
     else:
