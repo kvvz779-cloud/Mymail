@@ -120,16 +120,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await start(update, context)
         return
 
-    # Взятие email — отправляем только кликабельный email через HTML
+    # Взятие email — отправляем только email в моноширинных кавычках
     elif len(text) == 2 and text.isalpha():
         state = text.upper()
         email = remove_email_from_state(state)
         if email:
-            # Используем HTML-режим для безопасной ссылки
             await update.message.reply_text(
-                f'<a href="mailto:{email}">{email}</a>',
-                parse_mode="HTML",
-                disable_web_page_preview=True
+                f"`{email}`",
+                parse_mode="MarkdownV2"
             )
         else:
             await update.message.reply_text(f"В штате {state} нет email'ов.")
