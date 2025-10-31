@@ -93,21 +93,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for line in lines:
             line = line.strip()
-            if not line:
+            if not line:  # пропускаем пустые строки
                 continue
 
             sep = '&' if '&' in line else '|'
             parts = line.split(sep, 1)
             if len(parts) != 2:
-                continue
+                continue  # пропускаем строки без разделителя
 
             email, state = parts[0].strip(), parts[1].strip().upper()
 
             if not is_valid_email(email):
-                continue
+                continue  # пропускаем некорректные email
 
             if not state.isalpha() or len(state) != 2:
-                continue
+                continue  # пропускаем некорректные штаты
 
             add_email_to_state(state, email)
             added_count += 1
@@ -120,14 +120,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await start(update, context)
         return
 
-    # Взятие email — отправляем только кликабельный email
+    # Взятие email — отправляем только кликабельный email через HTML
     elif len(text) == 2 and text.isalpha():
         state = text.upper()
         email = remove_email_from_state(state)
         if email:
+            # Используем HTML-режим для безопасной ссылки
             await update.message.reply_text(
-                f"[{email}](mailto:{email})",
-                parse_mode="MarkdownV2",
+                f'<a href="mailto:{email}">{email}</a>',
+                parse_mode="HTML",
                 disable_web_page_preview=True
             )
         else:
